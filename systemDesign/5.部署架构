@@ -1,0 +1,87 @@
+
+
+```mermaid
+graph LR
+    %% Client Layer
+    subgraph Client["User Devices"]
+        UD1[Discord/X/TG App]
+        UD2[Web / Mobile Browser]
+    end
+
+    %% Load Balancer Layer
+    subgraph LB["Load Balancer"]
+        LB1[Bot Load Balancer]
+        LB2[Web Load Balancer]
+    end
+
+    %% Bot Server Layer
+    subgraph BotServer["Bot / Notification Cluster"]
+        B1[Discord Bot Instance 1]
+        B2[X Bot Instance 1]
+        B3[Telegram Bot Instance 1]
+        B4[Message Processor Cluster]
+    end
+
+    %% Web Server Layer
+    subgraph WebServer["Landing Page / Trading Cluster"]
+        WS1[Landing Page Instance 1]
+        WS2[Purchase/Listing/Trade Service Instance 1]
+    end
+
+    %% API Service Layer
+    subgraph APIService["Domain Event API Service"]
+        API1[Doma Testnet API]
+        API2[Event Fetch Scheduler]
+    end
+
+    %% Message Queue
+    subgraph MQ["Message Queue / Event Bus"]
+        MQ1["Event Queue - RabbitMQ/Kafka"]
+    end
+
+    %% Cache Layer
+    subgraph Cache["Cache Layer"]
+        R1[Redis / Memcached]
+    end
+
+    %% Database Layer
+    subgraph Database["Database Cluster"]
+        DB1[Users DB]
+        DB2[DomainEvents DB]
+        DB3[Notifications DB]
+        DB4[Transactions DB]
+        DB5[AnalysisResults DB]
+        DB6[OperationLogs DB]
+        DB7[DefaultPushPlan DB]
+        DB8[UserFilterHistory DB]
+    end
+
+    %% Connections
+    UD1 --> LB1
+    UD2 --> LB2
+    LB1 --> B1
+    LB1 --> B2
+    LB1 --> B3
+    LB2 --> WS1
+    LB2 --> WS2
+    B1 --> B4
+    B2 --> B4
+    B3 --> B4
+    B4 --> MQ1
+    MQ1 --> WS2
+    MQ1 --> B4
+    B4 --> API2
+    API2 --> API1
+    B4 --> R1
+    WS2 --> R1
+    B4 --> DB1
+    B4 --> DB2
+    B4 --> DB3
+    B4 --> DB5
+    B4 --> DB6
+    WS2 --> DB4
+    WS2 --> DB5
+    B4 --> DB7
+    B4 --> DB8
+```
+

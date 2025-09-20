@@ -1,0 +1,245 @@
+数据流图
+
+```mermaid
+flowchart TB
+
+    %% 数据流图 - 用户自定义推送
+
+  
+
+    %% 数据采集层
+
+    subgraph DL["数据采集与处理层"]
+
+        direction TB
+
+        style DL fill:#fff8b0,stroke:#333,stroke-width:2px
+
+        A1["域名事件监控"]
+
+        A2["事件处理系统"]
+
+        A3["过滤与分析模块"]
+
+        A4["Doma Testnet API"]
+
+    end
+
+  
+
+    %% 消息构建层
+
+    subgraph ML["消息构建层"]
+
+        direction TB
+
+        style ML fill:#fff0b0,stroke:#333,stroke-width:2px
+
+        M1["消息生成器"]
+
+        M2["默认方案模块"]
+
+        M3["用户自定义策略模块"]
+
+    end
+
+  
+
+    %% 集成层
+
+    subgraph IL["多端推送集成层"]
+
+        direction TB
+
+        style IL fill:#fff8b0,stroke:#333,stroke-width:2px
+
+        B1["Discord Bot"]
+
+        B2["X Bot"]
+
+        B3["Telegram Bot"]
+
+    end
+
+  
+
+    %% 用户层
+
+    subgraph UL["用户层"]
+
+        direction TB
+
+        style UL fill:#bbf,stroke:#333,stroke-width:2px
+
+        C1["Discord/X/TG 用户"]
+
+    end
+
+  
+
+    %% 落地页与交易
+
+    subgraph AL["落地页与交易"]
+
+        direction TB
+
+        style AL fill:#bbf,stroke:#333,stroke-width:2px
+
+        D1["落地页"]
+
+        D2["购买界面"]
+
+        D3["挂售界面"]
+
+        D4["交易平台"]
+
+    end
+
+  
+
+    %% 存储层
+
+    subgraph SL["存储层"]
+
+        direction TB
+
+        style SL fill:#f0f0f0,stroke:#333,stroke-width:2px
+
+        F1["事件数据库"]
+
+        F2["用户数据库"]
+
+        F3["交易数据库"]
+
+        F4["分析结果数据库"]
+
+    end
+
+  
+
+    %% 数据流
+
+    A4 --> A1
+
+    A1 --> A2
+
+    A2 --> A3
+
+    A3 --> M1
+
+    M1 --> M2
+
+    M1 --> M3
+
+    M2 --> B1
+
+    M2 --> B2
+
+    M2 --> B3
+
+    M3 --> B1
+
+    M3 --> B2
+
+    M3 --> B3
+
+    B1 --> C1
+
+    B2 --> C1
+
+    B3 --> C1
+
+    C1 --> D1
+
+    D1 --> D2
+
+    D1 --> D3
+
+    D1 --> D4
+
+    C1 --> M3
+
+    C1 --> F2
+
+    D2 --> F3
+
+    D3 --> F3
+
+    D4 --> F3
+
+    A1 --> F1
+
+    A3 --> F4
+```
+
+
+### 时序图
+
+
+```mermaid
+%% Domain Push System Sequence Diagram
+
+sequenceDiagram
+
+    participant User as User (Discord/X/TG)
+
+    participant Bot as Push Bot
+
+    participant API as Doma Testnet API
+
+    participant Processor as Event Processing System
+
+    participant Filter as Filtering & Analysis Module
+
+    participant Landing as Landing Page / Trading Platform
+
+    participant DB as Database
+
+  
+
+    %% User subscribes or chooses default plan
+
+    User->>Bot: Subscribe / Choose default push plan
+
+    Bot->>DB: Save user preference configuration
+
+  
+
+    %% Scheduled or triggered event
+
+    Bot->>API: Request domain event data
+
+    API-->>Bot: Return domain event information
+
+    Bot->>Processor: Send event data for processing
+
+    Processor->>Filter: Filter and analyze domain events
+
+    Filter-->>Bot: Return analysis results
+
+  
+
+    %% Bot pushes notification
+
+    Bot->>User: Send notification message (multi-channel)
+
+  
+
+    %% User clicks landing page
+
+    User->>Landing: Click notification link
+
+    Landing-->>User: Display domain details
+
+  
+
+    %% User executes transaction
+
+    User->>Landing: Purchase / List / Trade domain
+
+    Landing->>DB: Record transaction information
+
+    Landing-->>User: Confirm completion
+
+```
+

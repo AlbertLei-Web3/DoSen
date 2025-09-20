@@ -1,0 +1,87 @@
+
+```mermaid
+flowchart TB
+    %% Functional Module Architecture Diagram (English, with visible module headers)
+
+    %% Data Collection Layer
+    subgraph DL["Data Collection & Processing Layer"]
+        direction TB
+        style DL fill:#fff8b0,stroke:#333,stroke-width:2px
+        A1["Domain Events Monitor\n(Monitoring domain expiration, sales, trends)"]
+        A2["Event Processing System\n(Data cleaning & classification)"]
+        A3["Filter & Analysis Modules\n(Expired Filter / Price Analysis / Trend Analysis)"]
+    end
+
+    %% Message Construction Layer
+    subgraph ML["Message Construction Layer"]
+        direction TB
+        style ML fill:#fff0b0,stroke:#333,stroke-width:2px
+        M1["Message Builder\n(Formatting push content)"]
+    end
+
+    %% Integration Layer
+    subgraph IL["Integration Layer - Multi-channel Push"]
+        direction TB
+        style IL fill:#fff8b0,stroke:#333,stroke-width:2px
+        B1["Discord Bot"]
+        B2["X (formerly Twitter) Bot"]
+        B3["Telegram Bot"]
+    end
+
+    %% Application Layer
+    subgraph AL["Application Layer - User Interaction"]
+        direction TB
+        style AL fill:#fff0b0,stroke:#333,stroke-width:2px
+        C0["User Click / Interaction"]
+        C1["Landing Page"]
+        C2["Purchase Interface"]
+        C3["Listing Interface"]
+        C4["Trading Platform"]
+    end
+
+    %% User Preferences Layer
+    subgraph UP["User Configuration & Management"]
+        direction TB
+        style UP fill:#fff8b0,stroke:#333,stroke-width:2px
+        D1["User Preferences"]
+        D2["Subscription Manager"]
+    end
+
+    %% Storage Layer
+    subgraph SL["Storage Layer"]
+        direction TB
+        style SL fill:#fff0b0,stroke:#333,stroke-width:2px
+        F1["Events DB"]
+        F2["User DB"]
+        F3["Transaction DB"]
+        F4["Analysis Results DB"]
+    end
+
+    %% Data Flow
+    A1 --> A2
+    A2 --> A3
+    A3 --> M1
+    M1 --> B1
+    M1 --> B2
+    M1 --> B3
+    B1 --> C0
+    B2 --> C0
+    B3 --> C0
+    C0 --> C1
+    C1 --> C2
+    C1 --> C3
+    C1 --> C4
+    D1 --> D2
+    D2 --> A2
+    D2 --> F2
+    D1 --> F2
+    C2 --> F3
+    C3 --> F3
+    C4 --> F3
+    A1 --> F1
+    A3 --> F4
+    B1 --> F1
+    B2 --> F1
+    B3 --> F1
+
+```

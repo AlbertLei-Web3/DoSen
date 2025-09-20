@@ -27,6 +27,15 @@
 
 ## 环境变量
 - `PORT`（可选，默认 3000）
+- PostgreSQL（任选其一或使用 `DATABASE_URL` 全量连接串）：
+  - `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE`
+  - `DATABASE_URL=postgres://user:pass@host:5432/dbname`
 
 ## 设计范围
 严格按照 `systemDesign/` 文档实现最小闭环：采集→筛选分析→消息构建→多渠道推送桩→落地页→交易记录与溯源。
+
+## 数据库（PostgreSQL）
+1) 启动数据库并确认可连接
+2) 复制 `.env.example` 为 `.env` 并填写 PG 参数
+3) 运行迁移：`npm run db:migrate`
+4) 启动服务后，数据将写入 PostgreSQL

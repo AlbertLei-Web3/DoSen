@@ -5,137 +5,119 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { db } from './store';
 import { AnalysisResult, DomainEvent, Notification, Platform, TransactionRecord, User, OperationLog, UserFilterHistory } from './types';
-import { processEvent } from './pipeline';
+import { processEventDB } from './pipeline';
+import { query } from './db';
+import { createEventSchema, createTransactionSchema, createUserSchema, customSubscriptionSchema } from './validators';
 
 export const router = Router();
 
 // Users - create minimal user / 新建用户（最小）
-router.post('/users', (req, res) => {
-  const { username, platform } = req.body as { username?: string; platform?: Platform };
-  if (!username || !platform) {
-    return res.status(400).json({ error: 'username and platform are required' });
-  }
-  const now = new Date().toISOString();
-  const user: User = {
-    userId: uuid(),
-    username,
-    platform,
-    subscriptionPlan: 'Default',
-    createdAt: now,
-    updatedAt: now,
-  };
-  db.users.set(user.userId, user);
-  return res.status(201).json(user);
+router.post('/users', async (req, res) => {
+  const parsed = createUserSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { username, platform } = parsed.data;
+  const sql = `insert into users (username, platform) values ($1,$2) returning user_id, username, platform, subscription_plan, current_strategy_id, created_at, updated_at`;
+  const { rows } = await query(sql, [username, platform]);
+  return res.status(201).json(rows[0]);
 });
 
-router.get('/users/:id', (req, res) => {
-  const user = db.users.get(req.params.id);
-  if (!user) return res.status(404).json({ error: 'user not found' });
-  return res.json(user);
+router.get('/users/:id', async (req, res) => {
+  const { rows } = await query('select * from users where user_id=$1', [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'user not found' });
+  return res.json(rows[0]);
 });
 
 // Subscription management / 订阅管理（最小实现）
-router.post('/users/:id/subscriptions/default', (req, res) => {
-  const user = db.users.get(req.params.id);
-  if (!user) return res.status(404).json({ error: 'user not found' });
-  user.subscriptionPlan = 'Default';
-  user.updatedAt = new Date().toISOString();
-  const log: OperationLog = { logId: uuid(), userId: user.userId, action: 'SubscribeDefault', timestamp: user.updatedAt };
-  db.logs.set(log.logId, log);
-  return res.json(user);
+router.post('/users/:id/subscriptions/default', async (req, res) => {
+  const { rows } = await query('update users set subscription_plan=$1, updated_at=now() where user_id=$2 returning *', ['Default', req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'user not found' });
+  await query('insert into operation_logs(action, user_id) values($1,$2)', ['SubscribeDefault', req.params.id]);
+  return res.json(rows[0]);
 });
 
-router.post('/users/:id/subscriptions/custom', (req, res) => {
-  const user = db.users.get(req.params.id);
-  if (!user) return res.status(404).json({ error: 'user not found' });
-  const now = new Date().toISOString();
-  user.subscriptionPlan = 'Custom';
-  user.updatedAt = now;
-  const strategy: UserFilterHistory = {
-    strategyId: uuid(),
-    userId: user.userId,
-    filtersJson: req.body?.filters ?? {},
-    createdAt: now,
-    updatedAt: now,
-  };
-  user.currentStrategyId = strategy.strategyId;
-  db.strategies.set(strategy.strategyId, strategy);
-  const log: OperationLog = { logId: uuid(), userId: user.userId, action: 'SubscribeCustom', targetId: strategy.strategyId, details: strategy.filtersJson, timestamp: now };
-  db.logs.set(log.logId, log);
-  return res.json({ user, strategy });
+router.post('/users/:id/subscriptions/custom', async (req, res) => {
+  const parsed = customSubscriptionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const client = await (await import('pg')).Pool.prototype.connect.call(query);
+  try {
+    await query('begin');
+    const { rows: userRows } = await query('update users set subscription_plan=$1, updated_at=now() where user_id=$2 returning *', ['Custom', req.params.id]);
+    if (userRows.length === 0) {
+      await query('rollback');
+      return res.status(404).json({ error: 'user not found' });
+    }
+    const { rows: stratRows } = await query('insert into user_filter_history(user_id, filters_json) values($1,$2) returning *', [req.params.id, JSON.stringify(parsed.data.filters)]);
+    await query('update users set current_strategy_id=$1 where user_id=$2', [stratRows[0].strategy_id, req.params.id]);
+    await query('insert into operation_logs(action, user_id, target_id, details) values ($1,$2,$3,$4)', ['SubscribeCustom', req.params.id, stratRows[0].strategy_id, parsed.data.filters]);
+    await query('commit');
+    return res.json({ user: userRows[0], strategy: stratRows[0] });
+  } catch (e) {
+    await query('rollback');
+    return res.status(500).json({ error: 'subscription update failed' });
+  } finally {
+    // no-op
+  }
 });
 
 // Domain events - ingest & list / 事件上报与查询
-router.post('/events', (req, res) => {
-  const payload = req.body as Partial<DomainEvent> & { domainName?: string; eventType?: string };
-  if (!payload.domainName || !payload.eventType) {
-    return res.status(400).json({ error: 'domainName and eventType are required' });
-  }
-  const event: DomainEvent = {
-    eventId: uuid(),
-    domainName: payload.domainName,
-    eventType: payload.eventType as DomainEvent['eventType'],
-    price: payload.price,
-    timestamp: payload.timestamp || new Date().toISOString(),
-    source: payload.source || 'manual',
-    apiRequestPayload: payload.apiRequestPayload,
-    apiResponsePayload: payload.apiResponsePayload,
-    status: 'Success',
-    retriedTimes: 0,
-  };
-  db.events.set(event.eventId, event);
-  // Immediately process event through pipeline / 立刻进入管线
-  processEvent(event);
-  return res.status(201).json(event);
+router.post('/events', async (req, res) => {
+  const parsed = createEventSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const p = parsed.data;
+  const { rows } = await query(
+    `insert into domain_events(domain_name, event_type, price, timestamp, source, api_request_payload, api_response_payload, status, retried_times)
+     values ($1,$2,$3,coalesce($4, now()),$5,$6,$7,'Success',0)
+     returning *`,
+    [p.domainName, p.eventType, p.price ?? null, p.timestamp ?? null, p.source ?? 'manual', p.apiRequestPayload ?? null, p.apiResponsePayload ?? null]
+  );
+  const ev = rows[0];
+  await processEventDB(ev.event_id);
+  return res.status(201).json(ev);
 });
 
-router.get('/events', (_req, res) => {
-  return res.json(Array.from(db.events.values()));
+router.get('/events', async (_req, res) => {
+  const { rows } = await query('select * from domain_events order by timestamp desc limit 100');
+  return res.json(rows);
 });
 
 // Get single event / 查询单个事件
-router.get('/events/:id', (req, res) => {
-  const ev = db.events.get(req.params.id);
-  if (!ev) return res.status(404).json({ error: 'event not found' });
-  return res.json(ev);
+router.get('/events/:id', async (req, res) => {
+  const { rows } = await query('select * from domain_events where event_id=$1', [req.params.id]);
+  if (rows.length === 0) return res.status(404).json({ error: 'event not found' });
+  return res.json(rows[0]);
 });
 
 // Notifications - list by user / 按用户查询通知
-router.get('/users/:id/notifications', (req, res) => {
-  const list = Array.from(db.notifications.values()).filter(n => n.userId === req.params.id);
-  return res.json(list);
+router.get('/users/:id/notifications', async (req, res) => {
+  const { rows } = await query('select * from notifications where user_id=$1 order by sent_at desc nulls last', [req.params.id]);
+  return res.json(rows);
 });
 
 // Transactions - create minimal record / 创建最小交易记录
-router.post('/transactions', (req, res) => {
-  const { userId, domainName, transactionType, amount } = req.body as Partial<TransactionRecord> & { userId?: string; domainName?: string; transactionType?: string };
-  if (!userId || !domainName || !transactionType) {
-    return res.status(400).json({ error: 'userId, domainName, transactionType are required' });
-  }
-  const tx: TransactionRecord = {
-    transactionId: uuid(),
-    userId,
-    domainName,
-    transactionType: transactionType as TransactionRecord['transactionType'],
-    amount,
-    status: 'Pending',
-    timestamp: new Date().toISOString(),
-  };
-  db.transactions.set(tx.transactionId, tx);
-  const log: OperationLog = { logId: uuid(), userId, action: `Tx:${tx.transactionType}`, targetId: tx.transactionId, details: { domainName, amount }, timestamp: tx.timestamp };
-  db.logs.set(log.logId, log);
+router.post('/transactions', async (req, res) => {
+  const parsed = createTransactionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const p = parsed.data;
+  const { rows } = await query(
+    `insert into transactions(user_id, domain_name, transaction_type, amount, status)
+     values ($1,$2,$3,$4,'Pending') returning *`,
+    [p.userId, p.domainName, p.transactionType, p.amount ?? null]
+  );
+  const tx = rows[0];
+  await query('insert into operation_logs(action, user_id, target_id, details) values ($1,$2,$3,$4)', [`Tx:${tx.transaction_type}`, p.userId, tx.transaction_id, { domainName: p.domainName, amount: p.amount ?? null } as any]);
   return res.status(201).json(tx);
 });
 
 // Analysis results - list by event / 按事件查询分析结果
-router.get('/events/:id/analysis', (req, res) => {
-  const list: AnalysisResult[] = Array.from(db.analysisResults.values()).filter(a => a.eventId === req.params.id);
-  return res.json(list);
+router.get('/events/:id/analysis', async (req, res) => {
+  const { rows } = await query('select * from analysis_results where event_id=$1', [req.params.id]);
+  return res.json(rows);
 });
 
 // Logs - list recent / 最近操作日志
-router.get('/logs', (_req, res) => {
-  return res.json(Array.from(db.logs.values()));
+router.get('/logs', async (_req, res) => {
+  const { rows } = await query('select * from operation_logs order by timestamp desc limit 100');
+  return res.json(rows);
 });
 
 

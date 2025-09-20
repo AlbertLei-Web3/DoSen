@@ -7,6 +7,7 @@
 import { v4 as uuid } from 'uuid';
 import { db } from './store';
 import { AnalysisResult, DomainEvent, Notification } from './types';
+import { query } from './db';
 
 // Simple filter function / 简单过滤（示例：价格>0 或有趋势）
 export function matchesDefaultFilters(event: DomainEvent): boolean {
@@ -23,32 +24,21 @@ export function buildMessage(event: DomainEvent): string {
 }
 
 // Enqueue and simulate sending to all users / 入队并模拟向所有用户发送
-export function processEvent(event: DomainEvent): void {
-  if (!matchesDefaultFilters(event)) return;
+export async function processEventDB(eventId: string): Promise<void> {
+  // Load event
+  const { rows: evRows } = await query<DomainEvent>('select * from domain_events where event_id=$1', [eventId]);
+  if (evRows.length === 0) return;
+  const ev = evRows[0] as any as DomainEvent;
+  if (!matchesDefaultFilters(ev)) return;
 
-  // Simple analysis stub / 简单分析桩
-  const analysis: AnalysisResult = {
-    analysisId: uuid(),
-    eventId: event.eventId,
-    score: event.price ? Math.min(100, Math.max(0, Math.round(event.price))) : undefined,
-    createdAt: new Date().toISOString(),
-  };
-  db.analysisResults.set(analysis.analysisId, analysis);
+  // analysis
+  const score = ev.price ? Math.min(100, Math.max(0, Math.round(Number(ev.price)))) : null;
+  await query('insert into analysis_results(event_id, score) values ($1,$2)', [eventId, score]);
 
-  const message = buildMessage(event);
-  // Broadcast to all users for MVP / MVP 阶段广播给所有用户
-  for (const user of db.users.values()) {
-    const n: Notification = {
-      notificationId: uuid(),
-      userId: user.userId,
-      eventId: event.eventId,
-      channel: user.platform,
-      status: 'Queued',
-    };
-    db.notifications.set(n.notificationId, n);
-    // Simulate sending success / 模拟发送成功
-    n.status = 'Sent';
-    n.sentAt = new Date().toISOString();
+  // notifications: broadcast MVP
+  const { rows: users } = await query('select user_id, platform from users');
+  for (const u of users) {
+    await query('insert into notifications(user_id, event_id, channel, status, sent_at) values ($1,$2,$3,$4, now())', [u.user_id, eventId, u.platform, 'Sent']);
   }
 }
 

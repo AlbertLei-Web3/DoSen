@@ -1,0 +1,204 @@
+postgresql
+
+## 1️⃣ 数据库表设计（文字版）
+
+### 1. Users 表
+
+|字段|类型|描述|
+|---|---|---|
+|user_id|UUID|用户唯一标识|
+|username|String|用户名 / 昵称|
+|platform|Enum|Discord / X / Telegram|
+|subscription_plan|Enum|默认方案 / 自定义方案|
+|current_strategy_id|UUID|当前策略 ID，关联 UserFilterHistory|
+|created_at|Timestamp|注册时间|
+|updated_at|Timestamp|最近更新时间|
+
+---
+
+### 2. UserFilterHistory 表
+
+|字段|类型|描述|
+|---|---|---|
+|strategy_id|UUID|策略唯一标识|
+|user_id|UUID|用户 ID|
+|filters_json|JSON|自定义过滤条件|
+|created_at|Timestamp|策略创建时间|
+|updated_at|Timestamp|最后更新时间|
+
+---
+
+### 3. DefaultPushPlan 表
+
+|字段|类型|描述|
+|---|---|---|
+|plan_id|UUID|默认方案 ID|
+|name|String|方案名称|
+|description|String|方案描述|
+|filters_json|JSON|默认过滤条件|
+|created_at|Timestamp|创建时间|
+|updated_at|Timestamp|更新时间|
+
+---
+
+### 4. DomainEvents 表
+
+|字段|类型|描述|
+|---|---|---|
+|event_id|UUID|事件唯一标识|
+|domain_name|String|域名|
+|event_type|Enum|Expired / Sale / Trend|
+|price|Decimal|域名价格|
+|timestamp|Timestamp|事件发生时间|
+|source|String|数据来源（API 名称）|
+|api_request_payload|JSON|请求参数（存储用于排查）|
+|api_response_payload|JSON|API 返回数据|
+|status|Enum|Success / Failed|
+|retried_times|Int|重试次数|
+
+---
+
+### 5. Notifications 表
+
+|字段|类型|描述|
+|---|---|---|
+|notification_id|UUID|通知唯一标识|
+|user_id|UUID|接收用户|
+|event_id|UUID|关联域名事件|
+|channel|Enum|Discord / X / Telegram|
+|sent_at|Timestamp|推送时间|
+|status|Enum|Sent / Failed|
+
+---
+
+### 6. Transactions 表
+
+|字段|类型|描述|
+|---|---|---|
+|transaction_id|UUID|交易唯一标识|
+|user_id|UUID|执行用户|
+|domain_name|String|域名|
+|transaction_type|Enum|Purchase / List / Trade|
+|amount|Decimal|交易金额|
+|status|Enum|Success / Failed|
+|timestamp|Timestamp|交易时间|
+
+---
+
+### 7. AnalysisResults 表
+
+|字段|类型|描述|
+|---|---|---|
+|analysis_id|UUID|分析记录唯一标识|
+|event_id|UUID|关联域名事件|
+|user_id|UUID|用户 ID 或策略 ID，用于多策略分析|
+|score|Decimal|分析评分 / 热度|
+|trend|String|趋势类型|
+|created_at|Timestamp|分析时间|
+
+---
+
+### 8. OperationLogs 表（可选）
+
+|字段|类型|描述|
+|---|---|---|
+|log_id|UUID|日志唯一标识|
+|actor|String|用户 / Bot / 系统|
+|action|String|操作行为描述|
+|target_id|UUID|影响对象 ID（事件/策略/交易）|
+|details|JSON|详细参数或结果|
+|timestamp|Timestamp|日志时间|
+
+---
+
+## 2️⃣ Mermaid 可视化存储设计图
+
+```mermaid
+erDiagram
+    USERS {
+        UUID user_id PK
+        string username
+        enum platform
+        enum subscription_plan
+        UUID current_strategy_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    USER_FILTER_HISTORY {
+        UUID strategy_id PK
+        UUID user_id FK
+        json filters_json
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    DEFAULT_PUSH_PLAN {
+        UUID plan_id PK
+        string name
+        string description
+        json filters_json
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    DOMAIN_EVENTS {
+        UUID event_id PK
+        string domain_name
+        enum event_type
+        decimal price
+        timestamp timestamp
+        string source
+        json api_request_payload
+        json api_response_payload
+        enum status
+        int retried_times
+    }
+
+    NOTIFICATIONS {
+        UUID notification_id PK
+        UUID user_id FK
+        UUID event_id FK
+        enum channel
+        timestamp sent_at
+        enum status
+    }
+
+    TRANSACTIONS {
+        UUID transaction_id PK
+        UUID user_id FK
+        string domain_name
+        enum transaction_type
+        decimal amount
+        enum status
+        timestamp timestamp
+    }
+
+    ANALYSIS_RESULTS {
+        UUID analysis_id PK
+        UUID event_id FK
+        UUID user_id FK
+        decimal score
+        string trend
+        timestamp created_at
+    }
+
+    OPERATION_LOGS {
+        UUID log_id PK
+        string actor
+        string action
+        UUID target_id
+        json details
+        timestamp timestamp
+    }
+
+    USERS ||--o{ USER_FILTER_HISTORY : "has"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ TRANSACTIONS : "executes"
+    DOMAIN_EVENTS ||--o{ NOTIFICATIONS : "triggers"
+    DOMAIN_EVENTS ||--o{ ANALYSIS_RESULTS : "analyzed"
+    USER_FILTER_HISTORY ||--o{ ANALYSIS_RESULTS : "used_in"
+```
+
+---
+

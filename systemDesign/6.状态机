@@ -1,0 +1,35 @@
+
+
+```mermaid
+stateDiagram-v2
+    [*] --> NewEvent : Event Detected / Fetched
+
+    %% Filter and strategy
+    NewEvent --> Filtered : Apply Default/User Filters
+    Filtered --> Ignored : Does Not Match Preferences
+    Filtered --> PendingQueue : Matches Filters
+
+    %% Queue & async push
+    PendingQueue --> Queued : Push to MQ
+    Queued --> Sending : Bot/Worker Consumes
+    Sending --> Sent : Success
+    Sending --> Failed : Failure
+    Failed --> Retry : Retry Logic
+    Retry --> Sending
+
+    %% User interaction
+    Sent --> Viewed : User Viewed Notification
+    Viewed --> Clicked : User Clicked Landing Page
+    Clicked --> ActionTaken : Buy / Sell / Trade
+    ActionTaken --> Completed : Transaction Completed
+    Completed --> [*]
+
+    %% Optional exceptions
+    Ignored --> [*]
+    Sending --> Cancelled : User/Timeout Cancel
+    Cancelled --> [*]
+```
+
+---
+
+    

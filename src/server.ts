@@ -13,6 +13,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { router } from './routes';
 import { db } from './store';
+import { query } from './db';
 
 dotenv.config();
 
@@ -39,8 +40,9 @@ app.use('/', express.static(path.join(process.cwd(), 'public')));
 app.use('/api', router);
 
 // Debug endpoints to observe MVP state / MVP 调试端点
-app.get('/api/debug/notifications', (_req, res) => {
-  res.json(Array.from(db.notifications.values()));
+app.get('/api/debug/notifications', async (_req, res) => {
+  const { rows } = await query('select * from notifications order by sent_at desc nulls last limit 100');
+  res.json(rows);
 });
 
 // 事件处理已在路由中触发，这里不再重复钩子

@@ -7,7 +7,7 @@
 import { v4 as uuid } from 'uuid';
 import { db } from './store';
 import { AnalysisResult, DomainEvent, Notification } from './types';
-import { query } from './db';
+import { query } from './db/index';
 
 // Simple filter function / 简单过滤（示例：价格>0 或有趋势）
 export function matchesDefaultFilters(event: DomainEvent): boolean {

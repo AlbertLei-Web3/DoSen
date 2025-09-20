@@ -1,8 +1,8 @@
--- PostgreSQL schema for DoSen (aligned with systemDesign/4.数据库)
+-- Moved schema file / 迁移后的 schema 文件
+-- Content identical to previous src/db_schema.sql
 
 create extension if not exists "uuid-ossp";
 
--- 1. Users
 create table if not exists users (
   user_id uuid primary key default uuid_generate_v4(),
   username text not null,
@@ -13,7 +13,6 @@ create table if not exists users (
   updated_at timestamptz not null default now()
 );
 
--- 2. UserFilterHistory
 create table if not exists user_filter_history (
   strategy_id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references users(user_id) on delete cascade,
@@ -22,7 +21,6 @@ create table if not exists user_filter_history (
   updated_at timestamptz not null default now()
 );
 
--- 3. DefaultPushPlan
 create table if not exists default_push_plan (
   plan_id uuid primary key default uuid_generate_v4(),
   name text not null,
@@ -32,7 +30,6 @@ create table if not exists default_push_plan (
   updated_at timestamptz not null default now()
 );
 
--- 4. DomainEvents
 create table if not exists domain_events (
   event_id uuid primary key default uuid_generate_v4(),
   domain_name text not null,
@@ -46,7 +43,6 @@ create table if not exists domain_events (
   retried_times int not null default 0
 );
 
--- 5. Notifications
 create table if not exists notifications (
   notification_id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references users(user_id) on delete cascade,
@@ -56,7 +52,6 @@ create table if not exists notifications (
   status text not null check (status in ('Sent','Failed','Queued'))
 );
 
--- 6. Transactions
 create table if not exists transactions (
   transaction_id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references users(user_id) on delete cascade,
@@ -67,7 +62,6 @@ create table if not exists transactions (
   timestamp timestamptz not null default now()
 );
 
--- 7. AnalysisResults
 create table if not exists analysis_results (
   analysis_id uuid primary key default uuid_generate_v4(),
   event_id uuid not null references domain_events(event_id) on delete cascade,
@@ -77,7 +71,6 @@ create table if not exists analysis_results (
   created_at timestamptz not null default now()
 );
 
--- 8. OperationLogs (optional)
 create table if not exists operation_logs (
   log_id uuid primary key default uuid_generate_v4(),
   actor text null,
@@ -88,7 +81,6 @@ create table if not exists operation_logs (
   timestamp timestamptz not null default now()
 );
 
--- indices
 create index if not exists idx_domain_events_type_time on domain_events(event_type, timestamp desc);
 create index if not exists idx_notifications_user on notifications(user_id);
 create index if not exists idx_notifications_event on notifications(event_id);

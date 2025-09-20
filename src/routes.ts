@@ -6,7 +6,7 @@ import { v4 as uuid } from 'uuid';
 import { db } from './store';
 import { AnalysisResult, DomainEvent, Notification, Platform, TransactionRecord, User, OperationLog, UserFilterHistory } from './types';
 import { processEventDB } from './pipeline';
-import { query } from './db';
+import { query } from './db/index';
 import { createEventSchema, createTransactionSchema, createUserSchema, customSubscriptionSchema } from './validators';
 
 export const router = Router();

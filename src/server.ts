@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { router } from './routes';
 import { db } from './store';
-import { query } from './db';
+import { query } from './db/index';
 
 dotenv.config();
 

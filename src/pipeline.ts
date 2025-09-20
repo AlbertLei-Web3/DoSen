@@ -40,6 +40,8 @@ export async function processEventDB(eventId: string): Promise<void> {
   for (const u of users) {
     await query('insert into notifications(user_id, event_id, channel, status, sent_at) values ($1,$2,$3,$4, now())', [u.user_id, eventId, u.platform, 'Sent']);
   }
+
+  // 保留最小行为：仍写入通知表，Discord 推送在其它命令接口或落地页中手动触发
 }
 
 

@@ -8,6 +8,7 @@ import { AnalysisResult, DomainEvent, Notification, Platform, TransactionRecord,
 import { processEventDB } from './pipeline';
 import { query } from './db/index';
 import { createEventSchema, createTransactionSchema, createUserSchema, customSubscriptionSchema } from './validators';
+import { sendToChannel } from './bot/discord';
 
 export const router = Router();
 
@@ -72,7 +73,19 @@ router.post('/events', async (req, res) => {
   );
   const ev = rows[0];
   await processEventDB(ev.event_id);
+  // Optional: simple DC push if env has channel / 可选：若配置了频道则发送一句话
+  if (process.env.DISCORD_CHANNEL_ID) {
+    try { await sendToChannel(process.env.DISCORD_CHANNEL_ID, `[${ev.event_type}] ${ev.domain_name} ${ev.price ? '$'+ev.price : ''}`); } catch {}
+  }
   return res.status(201).json(ev);
+});
+// Dev endpoint: say something to channel / 开发端点：让 Bot 在频道说句话
+router.post('/dev/discord/say', async (req, res) => {
+  const { channelId, content } = req.body as { channelId?: string; content?: string };
+  const cid = channelId || process.env.DISCORD_CHANNEL_ID;
+  if (!cid || !content) return res.status(400).json({ error: 'channelId and content required (or configure DISCORD_CHANNEL_ID)' });
+  await sendToChannel(cid, content);
+  return res.json({ ok: true });
 });
 
 router.get('/events', async (_req, res) => {

@@ -14,6 +14,7 @@ import path from 'path';
 import { router } from './routes';
 import { db } from './store';
 import { query } from './db/index';
+import { startDiscordBot } from './bot/discord';
 
 dotenv.config();
 
@@ -50,6 +51,12 @@ app.get('/api/debug/notifications', async (_req, res) => {
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`[DoSen] Server listening on http://localhost:${PORT}`);
+});
+
+// Start Discord bot on boot (non-blocking) / 启动时初始化 Discord Bot（不阻塞）
+startDiscordBot().catch((e)=>{
+  // eslint-disable-next-line no-console
+  console.warn('[Discord] start failed:', e?.message || e);
 });
 
 

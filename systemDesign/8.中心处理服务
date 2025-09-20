@@ -1,0 +1,34 @@
+能实现。思路是“一个中心处理服务 + 多平台适配器”的架构，平台端只是“显示与发送管道”，真正的数据采集/过滤/模板化/路由都在我们自己的服务里完成。
+
+- 核心服务（统一处理，和平台无关）
+  - 数据采集：Doma Poll API 轮询 + 游标/ACK
+  - 规范化事件：统一成内部 Event 模型
+  - 用户策略：默认方案 + 自定义过滤（eventTypes/TLD/关键词/评分/频控/去重）
+  - 消息模板：compact/detailed，多语言，支持深链（落地页/浏览器）
+  - 路由与速率：按用户与平台路由，限流与重试，去重与幂等
+  - 交付与回执：写 `Notifications`、`OperationLogs`，统计送达/点击/失败
+
+- 平台适配器（很薄的一层，封装各平台差异）
+  - DiscordAdapter：频道/私信发送、Embed、速率限制、权限校验
+  - TelegramAdapter：Bot API 发送/编辑、富文本/按钮、速率限制
+  - XAdapter：Tweet/Thread/Post 限制、媒体/长度、API 权限与配额
+  - 统一接口：send(message: RenderedMessage, target: ChannelOrUserId) → DeliveryResult
+  - 适配器只做鉴权/格式/限流差异，业务逻辑不落在平台代码里
+
+- 数据与配置（单一事实源）
+  - Users/Strategies：每用户各平台的接收目标（频道ID/ChatID/用户ID）
+  - DefaultPushPlan/UserFilterHistory：默认/自定义策略
+  - Cursors：各数据源的 lastId
+  - Notifications/OperationLogs：交付、回执、异常
+
+- 发送链路（标准闭环）
+  - poll → normalize → applyStrategy(user-by-user) → render(template, locale) → route(platform) → adapter.send → log → ack
+
+- 需要注意的差异与限制
+  - **X**：API 权限门槛较高，长度/速率/媒体限制严格
+  - **Telegram**：私聊/群聊的 chat_id 管理、按钮交互能力强
+  - **Discord**：Embed 更友好，频道权限与命令注册管理
+  - 统一做限流与重试，失败可降级（例如从富媒体降文本）
+
+- 结论
+  - 不必把完整逻辑“写在各平台Bot里”，只需实现轻量“适配器”。核心“采集→过滤→模板→路由→可靠交付”都在我们的服务中完成，然后把结果分发到 DC/TG/X。这样可维护性最好，复用最高，也便于后续新增平台。

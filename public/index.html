@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DoSen - 域名情报落地页 | Landing</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; margin: 24px; line-height: 1.6; }
+      .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; max-width: 720px; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+      a.btn { display: inline-block; padding: 8px 12px; border-radius: 8px; background: #111827; color: #fff; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <h1>DoSen</h1>
+    <p class="muted">域名情报推送与交易转化 · 最小演示页</p>
+    <div id="content" class="card">
+      <p>使用方式：</p>
+      <ol>
+        <li>调用 <code>POST /users</code> 创建一个用户。</li>
+        <li>调用 <code>POST /events</code> 上报一个域名事件。</li>
+        <li>刷新本页，下方将展示最近事件与通知。</li>
+      </ol>
+      <div class="row">
+        <a class="btn" href="#" onclick="seed();return false;">一键生成示例数据</a>
+      </div>
+      <hr />
+      <h2>最近事件</h2>
+      <pre id="events">加载中...</pre>
+      <h2>通知（全部用户）</h2>
+      <pre id="notifications">加载中...</pre>
+      <h2>操作（购买/出售/交易/订阅）</h2>
+      <div class="row">
+        <a class="btn" href="#" onclick="buy();return false;">购买 Buy</a>
+        <a class="btn" href="#" onclick="list();return false;">出售 Sell</a>
+        <a class="btn" href="#" onclick="trade();return false;">交易 Trade</a>
+        <a class="btn" href="#" onclick="subscribeDefault();return false;">订阅默认方案</a>
+        <a class="btn" href="#" onclick="subscribeCustom();return false;">订阅自定义方案</a>
+      </div>
+      <h2>最近日志</h2>
+      <pre id="logs">加载中...</pre>
+    </div>
+
+    <script>
+      let currentUser = null;
+      async function seed(){
+        currentUser = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:'demo', platform:'Discord'})}).then(r=>r.json());
+        await fetch('/api/events', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({domainName:'example.com', eventType:'Sale', price:12.34, source:'seed'})});
+        await load();
+      }
+      async function buy(){
+        await fetch('/api/transactions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({userId: currentUser?.userId, domainName:'example.com', transactionType:'Purchase', amount: 20})});
+        await load();
+      }
+      async function list(){
+        await fetch('/api/transactions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({userId: currentUser?.userId, domainName:'example.com', transactionType:'List', amount: 30})});
+        await load();
+      }
+      async function trade(){
+        await fetch('/api/transactions', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({userId: currentUser?.userId, domainName:'example.com', transactionType:'Trade', amount: 25})});
+        await load();
+      }
+      async function subscribeDefault(){
+        await fetch(`/api/users/${currentUser?.userId}/subscriptions/default`, {method:'POST'});
+        await load();
+      }
+      async function subscribeCustom(){
+        await fetch(`/api/users/${currentUser?.userId}/subscriptions/custom`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filters: {priceMin: 10}})});
+        await load();
+      }
+      async function load(){
+        const events = await fetch('/api/events').then(r=>r.json());
+        const notifications = await fetch('/api/debug/notifications').then(r=>r.json());
+        document.getElementById('events').textContent = JSON.stringify(events, null, 2);
+        document.getElementById('notifications').textContent = JSON.stringify(notifications, null, 2);
+        const logs = await fetch('/api/logs').then(r=>r.json());
+        document.getElementById('logs').textContent = JSON.stringify(logs, null, 2);
+      }
+      load();
+    </script>
+  </body>
+  </html>
+
+

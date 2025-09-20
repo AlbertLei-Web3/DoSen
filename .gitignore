@@ -2,7 +2,6 @@ node_modules/
 .vscode/
 package-lock.json
 .env
-dist/
 # Video files and folders - 视频文件和文件夹
 video/
 *.mp4
@@ -17,6 +16,8 @@ video/
 *.asf
 *.rm
 *.rmvb
-*.ts
+
 *.m3u8
 *.mpd
+
+systemDesign
